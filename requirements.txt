@@ -18,13 +18,14 @@ pycocotools
 python-magic
 scikit-image
 sentencepiece
-spacy
+spacy==2.3.9
 streamlit
 timm==0.4.12
 torch>=1.10.0
 torchvision
 tqdm
 transformers==4.33.2
+# transformers==4.25
 webdataset
 wheel
 torchaudio
@@ -35,5 +36,5 @@ peft
 
 easydict==1.9
 pyyaml_env_tag==0.1
-open3d==0.13.0
+open3d
 h5py
