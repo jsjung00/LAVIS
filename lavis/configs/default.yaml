@@ -7,4 +7,4 @@ env:
   # For default users
   # cache_root: "cache"
   # For internal use with persistent storage
-  cache_root: "/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/LAVIS/.cache/lavis"
+  cache_root: "/flow/LAVIS_10/.cache/lavis"
