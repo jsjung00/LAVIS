@@ -33,7 +33,7 @@ soundfile
 moviepy
 nltk
 peft
-
+huggingface_hub==0.25.2
 easydict==1.9
 pyyaml_env_tag==0.1
 open3d
