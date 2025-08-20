@@ -10,7 +10,7 @@ uv pip install -e .
 torchrun \
   --standalone \
   --nproc_per_node=gpu \
-  train.py --cfg-path lavis/projects/blip2/train/caption_coco_ft.yaml
+  train.py --cfg-path lavis/projects/blip2/train/caption_coco_ft_cryoet.yaml
 
 # multinode training
 # torchrun --nproc_per_node=8 --nnodes=3 train.py --cfg-path lavis/projects/blip2/train/caption_coco_ft.yaml
