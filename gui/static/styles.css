@@ -1,0 +1,21 @@
+#canvasWrapper {
+  min-height: 120px;
+}
+#imageCanvas,
+#drawCanvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* Ensure overlay canvas sits on top */
+#drawCanvas {
+  pointer-events: auto;
+}
+
+.large-text {
+  font-size: 1.5em;
+}
+
+#captionsList {
+  font-size: 0.8em;
+}

@@ -23,7 +23,7 @@ def normalize_to_uint8(arr: np.ndarray, p_low: float, p_high: float) -> np.ndarr
 
 
 def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
-                       p_low: float, p_high: float, padding: int, verbose: bool = True):
+                       p_low: float, p_high: float, verbose: bool = True):
     """
     Worker function that processes a single run and returns JSON entries for that run.
     Re-opens the zarr inside the worker (safer for multiprocessing).
@@ -31,9 +31,13 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
     zarr_root = SABER_reader2.SABERZarr(zarr_path)
     run = zarr_root.runs[run_idx]
 
-    if run.run_name.startswith("140") or run.run_name == "260":
-        print(f"Skipping run {run.run_name} due to known issues.")
-        return [] 
+    # if run.run_name.startswith("140") or run.run_name == "260":
+    #     print(f"Skipping run {run.run_name} due to known issues.")
+    #     return [] 
+
+    # if run.run_name.startswith("14069") or run.run_name.startswith("14070"):
+    #     print(f"Skipping run {run.run_name} due to known issues.")
+    #     return [] 
 
     sub_output_folder = os.path.join(output_folder, run.run_name)
     os.makedirs(sub_output_folder, exist_ok=True)
@@ -55,63 +59,58 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
     # Prepare a BGR version for drawing boxes (only when needed)
     for mask in run.masks:
         subentry = []
-        bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max = mask.bbox
-
-        if (bbox_x_max - bbox_x_min) < 20 or (bbox_y_max - bbox_y_min) < 20 or mask.area < 400:
+        try:
+            bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max = mask.bbox
+        except KeyError:
+            print(f"Mask {mask.mask_name} in run {run.run_name} has no bbox attribute.", flush=True)
             continue
 
-        if not mask.description or not mask.hashtags: 
+        if (bbox_x_max - bbox_x_min) < 20 or (bbox_y_max - bbox_y_min) < 20 or (bbox_x_max - bbox_x_min) * (bbox_y_max - bbox_y_min) < 400:
+            continue
+
+        if not mask.description:
             continue
 
         if mask.description == "#membrane":
             continue
 
-        # Apply padding and clamp
         h, w = norm_img.shape[:2]
-        x_min = max(0, bbox_x_min - padding)
-        y_min = max(0, bbox_y_min - padding)
-        x_max = min(w, bbox_x_max + padding)
-        y_max = min(h, bbox_y_max + padding)
 
-        # Masked image: keep pixels within bbox, zero elsewhere
-        # masked = np.zeros_like(norm_img)
-        # masked[y_min:y_max, x_min:x_max] = norm_img[y_min:y_max, x_min:x_max]
+        for padding in (20, 40):
+            x_min = max(0, bbox_x_min - padding)
+            y_min = max(0, bbox_y_min - padding)
+            x_max = min(w, bbox_x_max + padding)
+            y_max = min(h, bbox_y_max + padding)
 
-        # masked_path = os.path.join(sub_output_folder, f"{mask.mask_name}_masked.png")
-        # Image.fromarray(masked).save(masked_path)
+            # Bounded image with rectangle
+            bounded = norm_img.copy()
+            if bounded.ndim == 2 or (bounded.ndim == 3 and bounded.shape[2] == 1):
+                bounded = cv2.cvtColor(bounded, cv2.COLOR_GRAY2BGR)
+            cv2.rectangle(bounded, (x_min, y_min), (x_max, y_max), (0, 0, 255), 6)
 
-        # Bounded image with rectangle
-        bounded = norm_img.copy()
-        if bounded.ndim == 2 or (bounded.ndim == 3 and bounded.shape[2] == 1):
-            bounded = cv2.cvtColor(bounded, cv2.COLOR_GRAY2BGR)
-        cv2.rectangle(bounded, (x_min, y_min), (x_max, y_max), (0, 0, 255), 6)
+            rotation_ops = [
+                (0,   lambda img: img,                                      "r0"),
+                (90,  lambda img: cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE), "r90"),
+                (180, lambda img: cv2.rotate(img, cv2.ROTATE_180),          "r180"),
+                (270, lambda img: cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE), "r270"),
+            ]
+            flip_ops = [
+                (None, ""),    # no flip → original
+                (1, "fh"),     # horizontal flip
+            ]
 
-        rotation_ops = [
-            (0, lambda img: img, "r0"),
-            (90, lambda img: cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE), "r90"),
-            (180, lambda img: cv2.rotate(img, cv2.ROTATE_180), "r180"),
-            (270, lambda img: cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE), "r270"),
-        ]
-        flip_ops = [
-            (None, ""),    # no flip → this covers the original
-            (1, "fh"),     # horizontal flip
-        ]
-
-        for _, rot_fn, rtag in rotation_ops:
-            rotated = rot_fn(bounded)
-            for flip_code, ftag in flip_ops:
-                if flip_code is None:
-                    aug = rotated
-                else:
-                    aug = cv2.flip(rotated, flip_code)
-                aug_name = f"{mask.mask_name}_bounded_{rtag}{('_' + ftag) if ftag else ''}.png"
-                aug_path = os.path.join(sub_output_folder, aug_name)
-                cv2.imwrite(aug_path, aug)
-                subentry.append({
-                    "image": aug_path,
-                    "image_id": aug_path.replace("/", "_").replace(".png", ""),
-                    "caption": [mask.description.replace("#", "").replace("_", " ")],
-                })
+            for _, rot_fn, rtag in rotation_ops:
+                rotated = rot_fn(bounded)
+                for flip_code, ftag in flip_ops:
+                    aug = rotated if flip_code is None else cv2.flip(rotated, flip_code)
+                    aug_name = f"{mask.mask_name}_bounded_p{padding}_{rtag}{('_' + ftag) if ftag else ''}.png"
+                    aug_path = os.path.join(sub_output_folder, aug_name)
+                    cv2.imwrite(aug_path, aug)
+                    subentry.append({
+                        "image": aug_path,
+                        "image_id": aug_path.replace("/", "_").replace(".png", ""),
+                        "caption": [mask.description.replace("#", "").replace("_", " ")],
+                    })
 
         entries.append(subentry)
 
@@ -124,8 +123,9 @@ def parse_args():
     )
     parser.add_argument(
         "--zarr-path",
+        default="/hpc/projects/group.czii/utz.ermel/hackathon/training.zarr",
         # default="/hpc/projects/group.czii/rahel.woldeyes/20250819_Hack/10001_deepict_labels_RW.zarr",
-        default="/hpc/projects/group.czii/jonathan.schwartz/sam2/language/final/10001_labels_RW.zarr",
+        # default="/hpc/projects/group.czii/jonathan.schwartz/sam2/language/final/10001_labels_RW.zarr",
         # default="/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/10301_ais_ds/10301_ais_ds.zarr",
         # default="/hpc/projects/group.czii/jonathan.schwartz/sam2/language/final/10301_ais_ds.zarr",
         help="Path to the SABER Zarr root."
@@ -142,10 +142,6 @@ def parse_args():
     parser.add_argument(
         "--p-high", type=float, default=95.0,
         help="Upper percentile for clipping (default: 95.0)."
-    )
-    parser.add_argument(
-        "--padding", type=int, default=20,
-        help="Padding (in pixels) to expand each bounding box (default: 20)."
     )
     parser.add_argument(
         "--workers", type=int, default=0,
@@ -187,7 +183,6 @@ def main():
                     args.output_folder,
                     args.p_low,
                     args.p_high,
-                    args.padding,
                     args.verbose,
                 )
             )

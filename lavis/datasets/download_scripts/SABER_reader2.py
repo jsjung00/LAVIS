@@ -56,7 +56,7 @@ class SABERRun:
         """Initialize the run with its name and the Zarr store."""
         self.run_name = run_name
         self.zarr_store = zarr_store
-        self.metadata = json.loads(self.zarr_store[self.run_name].attrs["text_annotations"])
+        # self.metadata = json.loads(self.zarr_store[self.run_name].attrs["text_annotations"])
 
     @property
     def masks(self):
