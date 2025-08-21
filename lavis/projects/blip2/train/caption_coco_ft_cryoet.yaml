@@ -44,7 +44,7 @@ run:
   num_workers: 8
   accum_grad_iters: 1
 
-  max_len: 300
+  max_len: 40
   min_len: 6
   num_beams: 20
 
