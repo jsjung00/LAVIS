@@ -14,7 +14,7 @@ datasets:
       annotations:
         train:
           url: "none"
-          storage: cryoet/annotations/labels_train.json
+          storage: cryoet/annotations/labels_train_balanced.json
         val:
           url: "none"
           storage: cryoet/annotations/labels_val.json

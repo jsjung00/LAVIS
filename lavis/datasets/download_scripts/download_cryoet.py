@@ -31,6 +31,10 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
     zarr_root = SABER_reader2.SABERZarr(zarr_path)
     run = zarr_root.runs[run_idx]
 
+    if run.run_name.startswith("140") or run.run_name == "260":
+        print(f"Skipping run {run.run_name} due to known issues.")
+        return [] 
+
     sub_output_folder = os.path.join(output_folder, run.run_name)
     os.makedirs(sub_output_folder, exist_ok=True)
 
@@ -45,13 +49,21 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
     base_image_path = os.path.join(sub_output_folder, "image.png")
     Image.fromarray(norm_img).save(base_image_path)
 
+    # array of arrays (each subarray is per mask)
     entries = []
 
     # Prepare a BGR version for drawing boxes (only when needed)
     for mask in run.masks:
+        subentry = []
         bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max = mask.bbox
 
         if (bbox_x_max - bbox_x_min) < 20 or (bbox_y_max - bbox_y_min) < 20 or mask.area < 400:
+            continue
+
+        if not mask.description or not mask.hashtags: 
+            continue
+
+        if mask.description == "#membrane":
             continue
 
         # Apply padding and clamp
@@ -61,7 +73,7 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
         x_max = min(w, bbox_x_max + padding)
         y_max = min(h, bbox_y_max + padding)
 
-        # # Masked image: keep pixels within bbox, zero elsewhere
+        # Masked image: keep pixels within bbox, zero elsewhere
         # masked = np.zeros_like(norm_img)
         # masked[y_min:y_max, x_min:x_max] = norm_img[y_min:y_max, x_min:x_max]
 
@@ -83,7 +95,6 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
         flip_ops = [
             (None, ""),    # no flip → this covers the original
             (1, "fh"),     # horizontal flip
-            (0, "fv"),     # vertical flip
         ]
 
         for _, rot_fn, rtag in rotation_ops:
@@ -96,11 +107,13 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
                 aug_name = f"{mask.mask_name}_bounded_{rtag}{('_' + ftag) if ftag else ''}.png"
                 aug_path = os.path.join(sub_output_folder, aug_name)
                 cv2.imwrite(aug_path, aug)
-                entries.append({
+                subentry.append({
                     "image": aug_path,
                     "image_id": aug_path.replace("/", "_").replace(".png", ""),
-                    "caption": [mask.description],
+                    "caption": [mask.description.replace("#", "").replace("_", " ")],
                 })
+
+        entries.append(subentry)
 
     return entries
 
@@ -111,7 +124,10 @@ def parse_args():
     )
     parser.add_argument(
         "--zarr-path",
-        default="/hpc/projects/group.czii/jonathan.schwartz/sam2/language/final/10301_ais_ds.zarr",
+        # default="/hpc/projects/group.czii/rahel.woldeyes/20250819_Hack/10001_deepict_labels_RW.zarr",
+        default="/hpc/projects/group.czii/jonathan.schwartz/sam2/language/final/10001_labels_RW.zarr",
+        # default="/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/10301_ais_ds/10301_ais_ds.zarr",
+        # default="/hpc/projects/group.czii/jonathan.schwartz/sam2/language/final/10301_ais_ds.zarr",
         help="Path to the SABER Zarr root."
     )
     parser.add_argument(
@@ -120,12 +136,12 @@ def parse_args():
         help="Folder where images and labels.json will be written."
     )
     parser.add_argument(
-        "--p-low", type=float, default=20.0,
-        help="Lower percentile for clipping (default: 20)."
+        "--p-low", type=float, default=5.0,
+        help="Lower percentile for clipping (default: 5.0)."
     )
     parser.add_argument(
-        "--p-high", type=float, default=80.0,
-        help="Upper percentile for clipping (default: 80)."
+        "--p-high", type=float, default=95.0,
+        help="Upper percentile for clipping (default: 95.0)."
     )
     parser.add_argument(
         "--padding", type=int, default=20,
@@ -187,6 +203,10 @@ def main():
     np.random.shuffle(all_entries)
     # Split entries into train/val/test sets
     train_entries, val_entries, test_entries = np.split(all_entries, [int(0.8 * len(all_entries)), int(0.9 * len(all_entries))])
+    # flatten the entries
+    train_entries = np.concatenate(train_entries)
+    val_entries = np.concatenate(val_entries)
+    test_entries = np.concatenate(test_entries)
     # For all train entries, we modify the "caption" to be the first element in the list
     for entry in train_entries:
         entry["caption"] = entry["caption"][0]

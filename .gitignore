@@ -159,3 +159,5 @@ debug*/
 cache/
 
 *.out
+
+lavis/datasets/download_scripts/output_images*/
