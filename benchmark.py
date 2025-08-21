@@ -3,6 +3,7 @@ import json
 import os
 import re
 import torch
+import random
 from PIL import Image
 from lavis.models import load_model_and_preprocess
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -28,13 +29,18 @@ def main():
     model, vis_processors, _ = load_model_and_preprocess(name=args.model_name, model_type=args.model_type, is_eval=True, device=device)
 
     for image_json in args.image_json:
-        output_file = os.path.basename(image_json).replace(".json", "_output_full.tsv")
+        output_file = os.path.basename(image_json).replace(".json", "_output_8_20_9PM.tsv")
         print(f"Processing {image_json} and saving output to {output_file}")
 
         image_entries = []
         with open(image_json, "r") as f:
             data = json.load(f)
             image_entries.extend([(f"{args.output_folder_prefix}/{entry['image']}", entry["caption"]) for entry in data])
+
+        # randomly select 1000 images if more than 1000
+        if len(image_entries) > 1000:
+            print(f"More than 1000 images found, randomly selecting 1000.")
+            image_entries = random.sample(image_entries, 1000)
 
         with open(output_file, "w") as f:
             for image_path, caption in image_entries:

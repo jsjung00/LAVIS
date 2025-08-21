@@ -11,7 +11,7 @@ def rebalance_json(json_file):
         class_counts[obj['caption']] += 1
 
     total_num_classes = len(class_counts)
-    max_count = 2 * (len(list_objs) // total_num_classes)
+    max_count = 3 * (len(list_objs) // total_num_classes)
 
     print(f"Max count per class: {max_count}")
     print(f"Total number of classes: {total_num_classes}")
@@ -30,7 +30,7 @@ def rebalance_json(json_file):
     with open(new_file_name, 'w') as fp:
         json.dump(balanced_list, fp, indent=4)
     
-    print(f"Rebalanced to {new_file_name}")
+    print(f"Rebalanced to {new_file_name} with {len(balanced_list)} entries.")
 
 
 if __name__ == "__main__":

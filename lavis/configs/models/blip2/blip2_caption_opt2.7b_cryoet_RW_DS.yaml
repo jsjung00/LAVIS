@@ -7,8 +7,8 @@ model:
   arch: caption_coco_opt2.7b
   load_finetuned: True
 
-  pretrained: "/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/LAVIS/lavis/output/BLIP2/Caption_cryoet_RW_8_20_6PM_balanced/20250820181/checkpoint_best.pth"
-  finetuned: "/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/LAVIS/lavis/output/BLIP2/Caption_cryoet_RW_8_20_6PM_balanced/20250820181/checkpoint_best.pth"
+  pretrained: "/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/LAVIS/lavis/output/BLIP2/Caption_cryoet_RW_DS_8_20_9PM_balanced/20250820213/checkpoint_19.pth"
+  finetuned: "/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/LAVIS/lavis/output/BLIP2/Caption_cryoet_RW_DS_8_20_9PM_balanced/20250820213/checkpoint_19.pth"
 
   # vit encoder
   image_size: 364
