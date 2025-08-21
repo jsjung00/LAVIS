@@ -1,0 +1,42 @@
+ # Copyright (c) 2022, salesforce.com, inc.
+ # All rights reserved.
+ # SPDX-License-Identifier: BSD-3-Clause
+ # For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+
+model:
+  arch: caption_coco_opt2.7b
+  load_finetuned: True
+
+  pretrained: "/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/LAVIS/lavis/output/BLIP2/Caption_cryoet_RW_8_20_4_30PM_balanced/20250820162/checkpoint_best.pth"
+  finetuned: "/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/LAVIS/lavis/output/BLIP2/Caption_cryoet_RW_8_20_4_30PM_balanced/20250820162/checkpoint_best.pth"
+
+  # vit encoder
+  image_size: 364
+  drop_path_rate: 0
+  use_grad_checkpoint: False
+  vit_precision: "fp32"
+  freeze_vit: False
+
+  # Q-Former
+  num_query_token: 32
+
+  # OPT
+  opt_model: "facebook/opt-2.7b"
+
+  # generation configs
+  prompt: "a black and white microscopy photo, and in red outline the cell organelle: "
+
+
+preprocess:
+    vis_processor:
+        train:
+          name: "blip_image_train"
+          image_size: 364
+        eval:
+          name: "blip_image_eval"
+          image_size: 364
+    text_processor:
+        train:
+          name: "blip_caption"
+        eval:
+          name: "blip_caption"
