@@ -31,9 +31,9 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
     zarr_root = SABER_reader2.SABERZarr(zarr_path)
     run = zarr_root.runs[run_idx]
 
-    # if run.run_name.startswith("140") or run.run_name == "260":
-    #     print(f"Skipping run {run.run_name} due to known issues.")
-    #     return [] 
+    if run.run_name.startswith("140") or run.run_name == "260":
+        print(f"Skipping run {run.run_name} due to known issues.")
+        return [] 
 
     # if run.run_name.startswith("14069") or run.run_name.startswith("14070"):
     #     print(f"Skipping run {run.run_name} due to known issues.")
@@ -58,7 +58,6 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
 
     # Prepare a BGR version for drawing boxes (only when needed)
     for mask in run.masks:
-        subentry = []
         try:
             bbox_x_min, bbox_y_min, bbox_x_max, bbox_y_max = mask.bbox
         except KeyError:
@@ -72,6 +71,11 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
             continue
 
         if mask.description == "#membrane":
+            continue
+
+        caption = mask.description.replace("#", "").replace("_", " ")
+
+        if not caption:
             continue
 
         h, w = norm_img.shape[:2]
@@ -106,13 +110,11 @@ def process_single_run(zarr_path: str, run_idx: int, output_folder: str,
                     aug_name = f"{mask.mask_name}_bounded_p{padding}_{rtag}{('_' + ftag) if ftag else ''}.png"
                     aug_path = os.path.join(sub_output_folder, aug_name)
                     cv2.imwrite(aug_path, aug)
-                    subentry.append({
+                    entries.append({
                         "image": aug_path,
                         "image_id": aug_path.replace("/", "_").replace(".png", ""),
-                        "caption": [mask.description.replace("#", "").replace("_", " ")],
+                        "caption": [caption],
                     })
-
-        entries.append(subentry)
 
     return entries
 
@@ -123,8 +125,8 @@ def parse_args():
     )
     parser.add_argument(
         "--zarr-path",
-        default="/hpc/projects/group.czii/utz.ermel/hackathon/training.zarr",
-        # default="/hpc/projects/group.czii/rahel.woldeyes/20250819_Hack/10001_deepict_labels_RW.zarr",
+        # default="/hpc/projects/group.czii/utz.ermel/hackathon/training.zarr",
+        default="/hpc/projects/group.czii/rahel.woldeyes/20250819_Hack/10001_deepict_labels_RW.zarr",
         # default="/hpc/projects/group.czii/jonathan.schwartz/sam2/language/final/10001_labels_RW.zarr",
         # default="/hpc/projects/group.czii/daniel.ji/cryoet-data-portal-pick-extract/10301_ais_ds/10301_ais_ds.zarr",
         # default="/hpc/projects/group.czii/jonathan.schwartz/sam2/language/final/10301_ais_ds.zarr",
@@ -169,7 +171,7 @@ def main():
     # Choose worker count
     max_workers = args.workers if args.workers > 0 else (os.cpu_count() or 1)
 
-    all_entries = []
+    all_entries = [] # list of lists of augmented boxes 
 
     # Parallelize over run indices
     with ProcessPoolExecutor(max_workers=max_workers) as ex:
@@ -191,27 +193,38 @@ def main():
         # Here we just extend as completed; JSON order isn't critical, but you can reorder if desired.
         for fut in as_completed(futures):
             entries = fut.result()
-            all_entries.extend(entries)
+            all_entries.append(entries)
 
-    all_entries = np.array(all_entries)
+    # check 
+    len_inner_lists = [len(inner_list) for inner_list in all_entries]
+    print(f"Number of lens {len(set(len_inner_lists))}")
+    
+    shuffled_indices = np.arange(len(all_entries))
+
+    #all_entries = np.array(all_entries)
     np.random.seed(42)
-    np.random.shuffle(all_entries)
+    np.random.shuffle(shuffled_indices)
     # Split entries into train/val/test sets
-    train_entries, val_entries, test_entries = np.split(all_entries, [int(0.8 * len(all_entries)), int(0.9 * len(all_entries))])
-    # flatten the entries
-    train_entries = np.concatenate(train_entries)
-    val_entries = np.concatenate(val_entries)
-    test_entries = np.concatenate(test_entries)
+    train_indices, val_indices, test_indices = np.split(shuffled_indices, [int(0.8 * len(shuffled_indices)), int(0.9 * len(shuffled_indices))])
+    train_entries, val_entries, test_entries = [], [], [] 
+    for idx in train_indices:
+        train_entries.extend(all_entries[idx]) 
+    for idx in val_indices:
+        val_entries.extend(all_entries[idx])
+    for idx in test_indices:
+        test_entries.extend(all_entries[idx])
+   
+
     # For all train entries, we modify the "caption" to be the first element in the list
     for entry in train_entries:
         entry["caption"] = entry["caption"][0]
     # Write JSON files
     with open(output_train_json, 'w') as f:
-        json.dump(train_entries.tolist(), f, indent=4)
+        json.dump(train_entries, f, indent=4)
     with open(output_val_json, 'w') as f:
-        json.dump(val_entries.tolist(), f, indent=4)
+        json.dump(val_entries, f, indent=4)
     with open(output_test_json, 'w') as f:
-        json.dump(test_entries.tolist(), f, indent=4)
+        json.dump(test_entries, f, indent=4)
     print(f"Wrote {len(all_entries)} entries to {output_train_json}, {output_val_json}, and {output_test_json}")
 
 

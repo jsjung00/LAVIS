@@ -13,7 +13,7 @@ app = Flask(__name__)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model, vis_processors, _ = load_model_and_preprocess(
     name="blip2_opt",
-    model_type="cryoet-RW-DS",
+    model_type="cryoet-RW-DS ",
     is_eval=True,
     device=device,
 )

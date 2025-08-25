@@ -10,6 +10,26 @@
   const captionsList = document.getElementById("captionsList");
   const statusBox = document.getElementById("status");
 
+  const galleryEl = document.getElementById("gallery");
+  const galleryStatus = document.getElementById("galleryStatus");
+  const GALLERY_URLS = [
+    "https://files.cryoetdataportal.cziscience.com/10302/01082023_BrnoKrios_Arctis_WebUI_Position_35/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/01082023_BrnoKrios_Arctis_WebUI_Position_6/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/01082023_BrnoKrios_Arctis_WebUI_Position_8/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/01112022_BrnoKrios_Arctis_p3xe_grid1_Position_19/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/01122021_BrnoKrios_arctis_lam2_pos16/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/02052022_BrnoKrios_Arctis_grid_hGIS_Position_15/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/02052022_BrnoKrios_Arctis_grid_hGIS_Position_70/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/02052022_BrnoKrios_Arctis_grid_hGIS_Position_79/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/02122021_BrnoKrios_Arctis_lam1_pos6/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/06022023_BrnoKrios_Arctis_xe_Position_108/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/06022023_BrnoKrios_Arctis_xe_Position_92/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/08042022_BrnoKrios_Arctis_grid4_Position_3/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/08042022_BrnoKrios_Arctis_grid5_gistest_Position_17/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/08042022_BrnoKrios_Arctis_grid5_gistest_Position_27/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+    "https://files.cryoetdataportal.cziscience.com/10302/09022023_BrnoKrios_Arctis_xe_grid7_Position_12/Reconstructions/VoxelSpacing7.840/Images/100/key-photo-original.png",
+  ];
+
   const imgCtx = imageCanvas.getContext("2d");
   const drawCtx = drawCanvas.getContext("2d");
 
@@ -46,6 +66,35 @@
       drawCtx.strokeStyle = "red";
       drawCtx.strokeRect(x + 0.5, y + 0.5, w, h);
     }
+  }
+
+  function drawMainImageAndReset() {
+    canvasWrapper.classList.remove("d-none");
+    fitCanvasToImage(img.naturalWidth, img.naturalHeight);
+    imgCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+    imgCtx.drawImage(img, 0, 0, imageCanvas.width, imageCanvas.height);
+    hasBox = false;
+    redrawOverlay();
+    submitBtn.disabled = false;
+    clearBtn.disabled = true;
+  }
+
+  async function loadFromURL(url) {
+    statusBox.textContent = "Loading image…";
+    const newImg = new Image();
+    // Attempt to keep canvas untainted when the origin allows it
+    newImg.crossOrigin = "anonymous";
+    newImg.onload = () => {
+      img = newImg;
+      drawMainImageAndReset();
+      statusBox.textContent = "";
+    };
+    newImg.onerror = () => {
+      statusBox.textContent = "Failed to load image from URL.";
+    };
+    // Cache-busting to avoid stale thumbnails in certain setups
+    const sep = url.includes("?") ? "&" : "?";
+    newImg.src = url + sep + "t=" + Date.now();
   }
 
   // Load local image to canvas (client-side only)
@@ -155,6 +204,10 @@
       if (!resp.ok) throw new Error(payload.error || "Server error");
       const { captions } = payload;
       captions.forEach((t, i) => {
+        // set to 6 word maximum
+        // replace " - " with ", "
+        t = t.replace(/ - /g, ", ");
+        // t = t.split(" ").slice(0, 6).join(" ");
         if (i === 0) {
           mainCaption.textContent = t;
           return;
@@ -169,4 +222,35 @@
       statusBox.textContent = "Error: " + err.message;
     }
   });
+
+  (function initGallery() {
+    galleryEl.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    GALLERY_URLS.forEach((url, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "thumb-btn";
+      btn.setAttribute("data-url", url);
+      btn.setAttribute("aria-label", `Load gallery image ${idx + 1}`);
+      btn.innerHTML = `
+        <img style="width: 256px;" loading="lazy" alt="Gallery image ${
+          idx + 1
+        }" />
+      `;
+      const imgEl = btn.querySelector("img");
+      imgEl.src = url;
+      imgEl.referrerPolicy = "no-referrer";
+      // Clicking loads image to the canvas
+      btn.addEventListener("click", () => {
+        [...galleryEl.querySelectorAll(".thumb-btn.active")].forEach((b) =>
+          b.classList.remove("active")
+        );
+        btn.classList.add("active");
+        loadFromURL(url);
+      });
+      frag.appendChild(btn);
+    });
+    galleryEl.appendChild(frag);
+    galleryStatus.textContent = `Loaded ${GALLERY_URLS.length} gallery items.`;
+  })();
 })();

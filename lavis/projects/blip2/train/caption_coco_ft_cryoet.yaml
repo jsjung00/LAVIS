@@ -38,18 +38,18 @@ run:
   warmup_lr: 1e-8
   warmup_steps: 1000
   weight_decay: 0.05
-  max_epoch: 1000
+  max_epoch: 40
   batch_size_train: 16
   batch_size_eval: 8
-  num_workers: 4
+  num_workers: 8
   accum_grad_iters: 1
 
-  max_len: 60
+  max_len: 40
   min_len: 6
-  num_beams: 20
+  num_beams: 5
 
   seed: 42
-  output_dir: "output/BLIP2/Caption_cryoet_RW_DS_long"
+  output_dir: "output/BLIP2/Caption_cryoet_RW_DS_8_21_10AM_balanced"
 
   amp: True
   resume_ckpt_path: null
